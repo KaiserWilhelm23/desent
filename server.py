@@ -8,6 +8,9 @@ import sys
 import subprocess
 import os
 
+
+# Dedicated to the person who got me into coding, Regina... 
+
 # Function to check and install dependencies
 def install_and_import(package):
     try:
