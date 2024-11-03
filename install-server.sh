@@ -9,7 +9,7 @@ VENV_DIR="$INSTALL_DIR/venv"
 # Ensure the script is run as root
 if [ "$EUID" -ne 0 ]; then
   echo "Please run as root (use sudo)"
-  exit
+  exit 1
 fi
 
 # Step 1: Create the installation directory
@@ -40,4 +40,33 @@ else
 fi
 
 # Step 4: Create the systemd service file
-cat <<
+cat << EOL > $SERVICE_FILE
+[Unit]
+Description=Python Server Service
+After=network.target
+
+[Service]
+ExecStart=$VENV_DIR/bin/python3 $PYTHON_SCRIPT
+WorkingDirectory=$INSTALL_DIR
+Restart=always
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Set permissions and reload systemd
+chmod 644 $SERVICE_FILE
+systemctl daemon-reload
+echo "Created systemd service file at $SERVICE_FILE."
+
+# Step 5: Start and enable the service
+systemctl start server.service
+systemctl enable server.service
+echo "Started and enabled server service."
+
+echo "Installation complete. To manage the service, use:"
+echo "  sudo systemctl start server.service"
+echo "  sudo systemctl stop server.service"
+echo "  sudo systemctl status server.service"
