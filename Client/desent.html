@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeSent Chat Client</title>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background-color: #1e1e1e; 
+            color: #f1f1f1; 
+            display: flex; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        #serverContainer { 
+            width: 250px; 
+            padding: 20px; 
+            background-color: #333; 
+            border-right: 1px solid #555; 
+            overflow-y: auto; 
+        }
+        #chatContainer { 
+            flex: 1; 
+            padding: 20px; 
+            text-align: center; 
+            background-color: #444; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+        }
+        h1 { color: #00d1b2; font-size: 24px; text-align: center; }
+        #messages { 
+            border: 1px solid #555; 
+            height: 300px; 
+            overflow-y: scroll; 
+            padding: 10px; 
+            margin-bottom: 10px; 
+            background-color: #222; 
+            color: #00d1b2; 
+            border-radius: 4px; 
+            text-align: left; 
+        }
+        #messages p { margin: 5px 0; color: #f1f1f1; }
+        .input-group { 
+            display: flex; 
+            margin-bottom: 5px; 
+        }
+        input[type="text"] { 
+            flex: 1; 
+            padding: 8px; 
+            border: none; 
+            border-radius: 4px; 
+            margin-right: 5px; 
+            background-color: #555; 
+            color: #f1f1f1; 
+        }
+        button { 
+            padding: 8px 15px; 
+            border: none; 
+            background-color: #00d1b2; 
+            color: #1e1e1e; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: background-color 0.3s; 
+        }
+        button:hover { 
+            background-color: #00b59a; 
+        }
+        button:disabled { 
+            background-color: #666; 
+            color: #333; 
+            cursor: not-allowed; 
+        }
+        input[type="text"]:focus { 
+            outline: none; 
+            border: 1px solid #00d1b2; 
+        }
+        #server-list { 
+            list-style: none; 
+            padding: 0; 
+            margin: 0; 
+        }
+        #server-list li { 
+            cursor: pointer; 
+            padding: 10px; 
+            background-color: #444; 
+            margin: 5px 0; 
+            border-radius: 4px; 
+            transition: background-color 0.3s; 
+        }
+        #server-list li:hover { 
+            background-color: #555; 
+        }
+        .input-container { 
+            display: flex; 
+            justify-content: space-between; 
+        }
+    </style>
+</head>
+<body>
+    <div id="serverContainer">
+        <h1>Available Servers</h1>
+        <ul id="server-list"></ul>
+    </div>
+
+    <div id="chatContainer">
+        <h1>DeSent V 0.1.0</h1>
+        <div class="input-group">
+            <input type="text" id="ngrokString" placeholder="Enter ngrok string" />
+        </div>
+        <div class="input-container">
+            <input type="text" id="username" placeholder="Enter your username" />
+            <button onclick="connect()">Connect</button>
+        </div>
+        <div id="messages"></div>
+        <div class="input-container">
+            <input type="text" id="messageInput" placeholder="Type a message..." disabled />
+            <button onclick="sendMessage()" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+      let websocket;
+      let connected = false;
+  
+      // Fetch the server list from Firebase and display it
+      function fetchServers() {
+          fetch('https://desent-public-servers-default-rtdb.firebaseio.com/desent-public-servers.json')
+              .then(response => response.json())
+              .then(data => {
+                  const serverList = document.getElementById('server-list');
+                  serverList.innerHTML = '';
+                  for (const serverKey in data) {
+                      const server = data[serverKey];
+                      const listItem = document.createElement('li');
+                      // Display in the format: [Server Name] [Region] : [Identifier]
+                      listItem.textContent = `${server.name || `Server ${serverKey}`} ${server.region || 'N/A'} : ${server.url || 'No URL'}`;
+                      listItem.onclick = () => {
+                          document.getElementById('ngrokString').value = server.url; // Auto-fill ngrokString
+                      };
+                      serverList.appendChild(listItem);
+                  }
+              })
+              .catch(error => console.error('Error fetching servers:', error));
+      }
+  
+      // Call fetchServers to load the initial data
+      fetchServers();
+  
+      // Connect to WebSocket using ngrok string
+      function connect() {
+          const ngrokString = document.getElementById("ngrokString").value.trim();
+          const username = document.getElementById("username").value.trim();
+          if (!ngrokString || !username) {
+              alert("Please enter both ngrok string and username.");
+              return;
+          }
+  
+          const wsUrl = `wss://${ngrokString}.ngrok-free.app`; // Modify the URL based on the server setup
+          websocket = new WebSocket(wsUrl);
+  
+          websocket.onopen = () => {
+              connected = true;
+              websocket.send(username); // Send username as the first message
+              document.getElementById("messages").innerHTML += `<p><em>Connected as ${username}</em></p>`;
+              document.getElementById("messageInput").disabled = false;
+              document.querySelector("button[onclick='sendMessage()']").disabled = false;
+          };
+  
+          websocket.onmessage = (event) => {
+              const message = event.data;
+              document.getElementById("messages").innerHTML += `<p>${message}</p>`;
+              document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+          };
+  
+          websocket.onclose = () => {
+              connected = false;
+              document.getElementById("messages").innerHTML += `<p><em>Disconnected</em></p>`;
+              document.getElementById("messageInput").disabled = true;
+              document.querySelector("button[onclick='sendMessage()']").disabled = true;
+          };
+  
+          websocket.onerror = (error) => {
+              console.error("WebSocket error:", error);
+              document.getElementById("messages").innerHTML += `<p style="color: red;">Error: Unable to connect</p>`;
+          };
+      }
+  
+      // Send a message to the WebSocket server
+      function sendMessage() {
+          if (!connected) {
+              alert("Please connect first!");
+              return;
+          }
+  
+          const message = document.getElementById("messageInput").value.trim();
+          if (message) {
+              websocket.send(message);
+              document.getElementById("messages").innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+              document.getElementById("messageInput").value = ""; // Clear input after sending
+          }
+      }
+  
+      // Enable sending messages by pressing Enter key
+      document.getElementById("messageInput").addEventListener("keypress", function(event) {
+          if (event.key === "Enter") {
+              event.preventDefault(); // Prevents form submission if inside a form
+              sendMessage(); // Trigger sendMessage on Enter press
+          }
+      });
+  </script>
+  
+</body>
+</html>
