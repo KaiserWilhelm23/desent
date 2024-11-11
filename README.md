@@ -13,3 +13,10 @@ Statuse: STABLE
 ``` chmod +x install.sh ``` 
 
 ``` sudo ./install.sh ``` Will install Ngrok and python dependencies
+
+
+The Basic Message Flow. 
+![Basic Flow](images/basic_flow.png)
+
+Encryption and Onion Route Plan. 
+![Basic Flow](images/encryption_flow_onion.png)
