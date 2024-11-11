@@ -4,7 +4,7 @@ A decentralized text messaging application that uses Ngrok
 
 Statuse: STABLE
 
-# INSTALL PROCESS
+# INSTALL PROCESS (SERVER ONLY)
 
 ```git clone https://github.com/KaiserWilhelm23/desent.git ```
 
