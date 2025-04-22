@@ -3,7 +3,7 @@
 
 ```cd desent/Server```
 
-IMPORTANT!!! Copy the API key or Auth key to the AUTH file from Grok NGROK 
+IMPORTANT!!! Copy the API key or Auth key to the AUTH file from NGROK 
 
 ```sudo python3 server.py```
 
