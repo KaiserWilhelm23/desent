@@ -1,3 +1,6 @@
+# Server Version 0.1.0
+
+
 import asyncio
 import websockets
 from colorama import Fore
@@ -15,18 +18,29 @@ from pathlib import Path
 # This code is dedicated to Reginia...
 
 # Function to check and install dependencies
-def install_and_import(package):
+def install_and_import(package, import_name=None):
+    import_name = import_name or package
     try:
-        __import__(package)
+        __import__(import_name)
     except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        except subprocess.CalledProcessError:
+            print(Fore.YELLOW + f"Standard install failed for {package}, trying with sudo..." + Fore.RESET)
+            subprocess.check_call(["sudo", sys.executable, "-m", "pip", "install", package])
 
-# Check and install required packages
-install_and_import("websockets")
-install_and_import("colorama")
-install_and_import("pyfiglet")
-install_and_import("pyngrok")
-install_and_import("requests")
+# List of required packages
+required_packages = {
+    "websockets": "websockets",
+    "colorama": "colorama",
+    "pyfiglet": "pyfiglet",
+    "pyngrok": "pyngrok",
+    "requests": "requests"
+}
+
+# Install all required packages
+for pkg, import_as in required_packages.items():
+    install_and_import(pkg, import_as)
 
 # Initialize figlet font for title
 f = Figlet(font='slant')
@@ -42,27 +56,21 @@ def load_config():
             config = json.load(f)
         print(Fore.GREEN + "Loaded configuration from config.json" + Fore.RESET)
     else:
-        # Prompt the user for input to create a config file
         print(Fore.YELLOW + "No config file found. Creating a new one." + Fore.RESET)
-        
         post_response = input("Do you want the server Public? (y/n): ").strip().lower()
         post = True if post_response == "y" else False
-        
         name = input("Enter the name of the server (if public): ").strip() if post else ""
         subdomain = input("Enter subdomain (leave blank for random if public, or skip if private): ").strip() if post else ""
         region = input("Enter region (required if public): ").strip() if post else ""
-
-        # Create the default config with user input
         config = {
             "POST": post,
             "NAME": name,
-            "subdomain": subdomain if subdomain else None,  # Skip prompt by setting a default or "None" for random subdomain
+            "subdomain": subdomain if subdomain else None,
             "region": region
         }
         save_config(config)
     return config
 
-# Function to save the configuration to the config.json file
 def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
@@ -85,31 +93,26 @@ def get_ngrok_auth_token():
         print(Fore.GREEN + "Ngrok auth token saved to AUTH.txt" + Fore.RESET)
     return auth_token
 
-# Set ngrok authentication token
 try:
     auth_token = get_ngrok_auth_token()
     ngrok.set_auth_token(auth_token)
 except Exception as e:
     print(Fore.RED + f"Error setting ngrok auth token: {e}" + Fore.RESET)
 
-# Function to publish or update server data in Firebase
 def publish_server(name, identifier, region):
     url = f'https://desent-public-servers-default-rtdb.firebaseio.com/desent-public-servers/{name}.json'
     data = {"name": name, "url": identifier, "region": region}
-
     response = requests.get(url)
     if response.status_code == 200 and response.json() is not None:
         print(Fore.YELLOW + f"Server name '{name}' exists, updating entry." + Fore.RESET)
     else:
         print(Fore.GREEN + f"Adding new server entry: {name}" + Fore.RESET)
-
     result = requests.put(url, json=data)
     if result.status_code == 200:
         print(Fore.GREEN + f"Server '{name}' published/updated successfully." + Fore.RESET)
     else:
         print(Fore.RED + f"Error publishing server '{name}': {result.text}" + Fore.RESET)
 
-# Function to remove server listing from Firebase
 def remove_server(name):
     url = f'https://desent-public-servers-default-rtdb.firebaseio.com/desent-public-servers/{name}.json'
     result = requests.delete(url)
@@ -118,11 +121,9 @@ def remove_server(name):
     else:
         print(Fore.RED + f"Error removing server '{name}': {result.text}" + Fore.RESET)
 
-# Dictionary to store connected clients
 clients = {}
 
-# Function to handle each client connection
-async def handle_client(websocket, path):  # path added
+async def handle_client(websocket, path):
     try:
         name = await websocket.recv()
         if name in clients:
@@ -136,7 +137,7 @@ async def handle_client(websocket, path):  # path added
 
         async for message in websocket:
             formatted_message = f"{name}: {message}"
-            print(formatted_message)  # Display each message in the console
+            print(formatted_message)
             for client_name, client_ws in clients.items():
                 if client_name != name:
                     await client_ws.send(formatted_message)
@@ -147,13 +148,10 @@ async def handle_client(websocket, path):  # path added
         for client_name, client_ws in clients.items():
             await client_ws.send(f"{name} has left the chat")
 
-# Main function to start the server
 async def start_server():
     subdomain = config["subdomain"] or ""
     region = config["region"] or ""
     server_name = config["NAME"] or ""
-
-    # Update config with user input if needed
     config.update({"subdomain": subdomain, "region": region, "NAME": server_name})
     save_config(config)
 
@@ -170,14 +168,12 @@ async def start_server():
         if config.get("POST"):
             publish_server(server_name, identifier, region)
 
-        # Start WebSocket server
         server = await websockets.serve(handle_client, "localhost", 8765, ping_timeout=None)
         print(Fore.GREEN + "WebSocket server started on ws://localhost:8765" + Fore.RESET)
         await server.wait_closed()
     except Exception as e:
         print(Fore.RED + f"Error starting ngrok or WebSocket server: {e}" + Fore.RESET)
 
-# Function to create systemd service file with automation
 def create_systemd_service():
     script_path = Path(__file__).resolve()
     working_dir = script_path.parent
@@ -197,7 +193,6 @@ Environment=PYTHONUNBUFFERED=1
 [Install]
 WantedBy=multi-user.target
 """
-
     service_path = Path("/etc/systemd/system/desent-server.service")
 
     try:
