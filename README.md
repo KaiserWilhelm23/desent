@@ -1,6 +1,6 @@
 # DeSent
 
-A decentralized text messaging application that uses Ngrok 
+A decentralized text messaging application that uses Ngrok, so not decentralized but this is being used as a proof of concept.
 
 Statuse: STABLE
 
